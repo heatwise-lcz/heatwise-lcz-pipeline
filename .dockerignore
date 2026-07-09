@@ -1,0 +1,16 @@
+# The two Dockerfiles in docker/ currently COPY nothing (they only clear the
+# base image's ENTRYPOINT), but keep the build context minimal anyway so a
+# future COPY can't accidentally pull in git history or local run outputs.
+.git/
+.gitignore
+output/
+outputs/
+cwl_output*/
+*.h5
+*.tif
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

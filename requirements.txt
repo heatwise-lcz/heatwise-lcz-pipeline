@@ -1,0 +1,6 @@
+# Dependencies of the two glue scripts in scripts/ (everything else they use
+# is the Python standard library). Inside the pipeline these scripts run in
+# the derived Docker images, whose base images already ship pyyaml -- this
+# file exists for running the scripts locally without Docker and to satisfy
+# the EOAP packaging guideline.
+pyyaml

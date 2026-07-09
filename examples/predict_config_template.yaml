@@ -1,0 +1,24 @@
+# Template for heatwise-lcz-classification's predict config.yaml.
+# inputs.hsi / inputs.sen2 / weights are filled in by
+# scripts/run_predict.py at pipeline run time.
+modal: hsi
+use_lst: false
+title: "Berlin LCZ (pipeline)"
+
+model:
+  hsi_bands: 30
+  msi_bands: 10
+  lst_bands: 1
+  num_classes: 17
+
+class_order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+
+sen2_scale: 10000.0
+patch_size: 32
+stride: 16
+batch_size: 32
+fill_interior_holes: false
+save_png: false
+map_nodata: 0
+
+output: output/Berlin_LCZ.tif
