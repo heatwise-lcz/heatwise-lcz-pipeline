@@ -7,7 +7,8 @@ doc: >
   config.yaml from heatwise-hsi-lst-prep's output directory + a labels
   Directory + the original Sentinel-2 raster, then immediately invokes
   heatwise-patch-extraction's own /app/processor.py *inside the same
-  container* (scripts/run_patch_extraction.py does both, back to back).
+  container* (/app/run_patch_extraction.py, baked into the derived image by
+  docker/patch-extraction-pipeline.Dockerfile, does both back to back).
 
   This is deliberately ONE CWL step, not two ("render config" then "run
   processor" as separate steps): each CWL step runs in its own container
@@ -18,50 +19,51 @@ doc: >
   steps.
 
   Uses a thin derived image (docker/patch-extraction-pipeline.Dockerfile,
-  `FROM heatwise-patch-extraction:latest` with ENTRYPOINT cleared) instead of
-  the original image directly: the original's `ENTRYPOINT ["python",
-  "/app/processor.py"]` can only be *appended to* by `docker run` arguments,
-  never replaced, which would make it impossible to run this different
-  script (scripts/run_patch_extraction.py) at all.
+  built from the versioned heatwise-patch-extraction base image with the glue
+  script COPYed in and ENTRYPOINT cleared) instead of the original image
+  directly: the original's
+  `ENTRYPOINT ["python", "/app/processor.py"]` can only be *appended to* by
+  `docker run` arguments, never replaced, which would make it impossible to
+  run this different script at all.
 
 requirements:
   DockerRequirement:
-    dockerImageId: heatwise-patch-extraction-pipeline:latest
-    dockerPull: ghcr.io/heatwise/heatwise-patch-extraction-pipeline:latest
+    dockerImageId: ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0
+    dockerPull: ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0
 
 baseCommand: python
+arguments:
+  # Absolute path: cwltool overrides the container working directory with a
+  # per-job staging directory, so the script must be addressed inside the
+  # image, not relative to the workdir.
+  - /app/run_patch_extraction.py
 
 inputs:
-  script:
-    type: File
-    inputBinding: {position: 1}
-    doc: scripts/run_patch_extraction.py
-
   template:
     type: File
-    inputBinding: {prefix: --template, position: 2}
+    inputBinding: {prefix: --template}
 
   prep_dir:
     type: Directory
-    inputBinding: {prefix: --prep-dir, position: 3}
+    inputBinding: {prefix: --prep-dir}
 
   sentinel2:
     type: File
-    inputBinding: {prefix: --sentinel2, position: 4}
+    inputBinding: {prefix: --sentinel2}
 
   labels_dir:
     type: Directory
-    inputBinding: {prefix: --labels-dir, position: 5}
+    inputBinding: {prefix: --labels-dir}
 
   labels_basename:
     type: string
-    inputBinding: {prefix: --labels-basename, position: 6}
+    inputBinding: {prefix: --labels-basename}
 
   output_h5_name:
     type: string
     default: output/patches.h5
-    inputBinding: {prefix: --output-h5, position: 7}
-    doc: Nested under output/ for consistency with prep/train's own output_dir convention.
+    inputBinding: {prefix: --output-h5}
+    doc: Nested under output/ for consistency with the other steps' output_dir convention.
 
 outputs:
   patch_h5:

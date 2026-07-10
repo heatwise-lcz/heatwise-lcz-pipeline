@@ -1,34 +1,26 @@
-# Job order for heatwise_pipeline.cwl, reusing the already-verified sample
-# data/configs that ship in the three original (untouched) repos -- no data
-# duplicated into this new folder, only the two new glue templates below
-# (patch_config_template.yaml, predict_config_template.yaml) and this job
-# file are new.
+# Job order for heatwise_pipeline.cwl. Fully self-contained: every path
+# points inside this repository (sample data under data/, configs/templates
+# under examples/). Paths are relative to this job file.
 prep_config:
   class: File
-  path: ../../heatwise-hsi-lst-prep/examples/run_all_config_docker.yaml
+  path: run_all_config_docker.yaml
 prep_catalog:
   class: File
-  path: ../../heatwise-hsi-lst-prep/examples/stac_input/catalog_docker.json
+  path: prep_catalog_docker.json
 sentinel2:
   class: File
-  path: ../../heatwise-hsi-lst-prep/examples/stac_input/Berlin_S2_2024-10-24_sample.tif
+  path: ../data/Berlin_S2_2024-10-24_sample.tif
 patch_config_template:
   class: File
   path: patch_config_template.yaml
 labels_dir:
   class: Directory
-  path: ../../heatwise-patch-extraction/data/Berlin
+  path: ../data/Berlin_labels
 labels_basename: Berlin_labels_sample
 train_config:
   class: File
-  path: ../../heatwise-lcz-classification/examples/train_config_sample.yaml
+  path: train_config_sample.yaml
 predict_config_template:
   class: File
   path: predict_config_template.yaml
 experiment_name: HSI-BS
-extract_patches_script:
-  class: File
-  path: ../scripts/run_patch_extraction.py
-predict_script:
-  class: File
-  path: ../scripts/run_predict.py

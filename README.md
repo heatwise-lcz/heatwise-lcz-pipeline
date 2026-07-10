@@ -1,183 +1,194 @@
 # heatwise-lcz-pipeline
 
-Chains the three HEATWISE EOAP processors into a single CWL `Workflow`,
-end to end:
+Self-contained EOAP workflow package chaining the three HEATWISE processors
+into a single CWL `Workflow`, end to end:
 
+```text
+heatwise-hsi-lst-prep -> heatwise-patch-extraction -> heatwise-lcz-classification train -> heatwise-lcz-classification predict
 ```
-heatwise-hsi-lst-prep  ->  heatwise-patch-extraction  ->  heatwise-lcz-classification (train)  ->  heatwise-lcz-classification (predict)
+
+The final step also writes a STAC catalog and item describing the final LCZ
+map and training metrics.
+
+## Relationship To Processor Repos
+
+The three processors remain independent repositories with their own code,
+Dockerfiles and CWL files; they are not modified by anything here. This repo
+consumes them only through Docker images.
+
+- `prep` and `train` run vendored copies of the upstream CWL files:
+  [tools/hsi_lst_prep.cwl](tools/hsi_lst_prep.cwl) and
+  [tools/lcz_train.cwl](tools/lcz_train.cwl). The processor code lives in
+  the images, so the CWL package has no `../sibling-repo/` runtime
+  dependency.
+- `extract_patches` and `predict` run merged glue+run CommandLineTools. Their
+  glue scripts are baked into thin derived images built from [docker/](docker/).
+
+Docker references are written in release shape and pinned to `0.1.0` tags
+under `ghcr.io/heatwise-lcz/...`. Before the images are published, build and tag
+them locally with the same names. After publication, the same CWL files can
+run elsewhere by pulling those exact tags.
+
+## Why Merged Glue Steps Exist
+
+`heatwise-patch-extraction` and `heatwise-lcz-classification predict` take a
+`config.yaml` whose contents reference staged file paths. Plain CWL step
+connections pass files and directories, but they do not rewrite YAML content.
+
+The first design rendered a config in one CWL step and consumed it in the
+next. That failed because each CWL step has its own container staging paths.
+The current tools render the config and run the processor inside the same
+container invocation:
+
+- [tools/extract_patches_pipeline.cwl](tools/extract_patches_pipeline.cwl)
+  calls `/app/run_patch_extraction.py`.
+- [tools/predict_pipeline.cwl](tools/predict_pipeline.cwl) calls
+  `/app/run_predict.py` and writes the final STAC output.
+
+The derived images are needed because the upstream images use
+`ENTRYPOINT ["python", "/app/processor.py"]`; Docker appends arguments to a
+fixed entrypoint instead of replacing it. The derived images clear
+`ENTRYPOINT`, add the glue script, and otherwise layer on top of the verified
+processor image.
+
+## Repository Structure
+
+```text
+heatwise-lcz-pipeline/
+|-- heatwise_pipeline.cwl
+|-- tools/
+|   |-- hsi_lst_prep.cwl
+|   |-- lcz_train.cwl
+|   |-- extract_patches_pipeline.cwl
+|   |-- predict_pipeline.cwl
+|-- scripts/
+|   |-- run_patch_extraction.py
+|   |-- run_predict.py
+|-- docker/
+|   |-- patch-extraction-pipeline.Dockerfile
+|   |-- lcz-classification-pipeline.Dockerfile
+|-- examples/
+|   |-- job.yaml
+|   |-- run_local.sh
+|   |-- run_all_config_docker.yaml
+|   |-- prep_catalog_docker.json
+|   |-- patch_config_template.yaml
+|   |-- predict_config_template.yaml
+|   |-- train_config_sample.yaml
+|-- data/
+|   |-- Berlin_S2_2024-10-24_sample.tif
+|   |-- Berlin_labels/
+|-- README.md
+|-- LICENSE
+|-- requirements.txt
 ```
 
-This folder is **new and separate** from the three processor repos
-(`../heatwise-hsi-lst-prep`, `../heatwise-patch-extraction`,
-`../heatwise-lcz-classification`), which are **not modified** by anything
-here. It only *references* their already-built Docker images and existing
-`.cwl` files (for `prep` and `train`; see below for why `extract_patches`
-and `predict` need a bit more).
+## Workflow
 
-## Why a merged glue+run step is needed (not a plain glue step)
-
-Each processor takes a `config.yaml` whose *contents* reference file paths
-(`inputs.hsi`, `inputs.sentinel2`, `weights`, ...). Plain CWL step-to-step
-connections (`out: [x]` -> `in: y: step/x`) pass **files/directories**, not
-the ability to rewrite the *content* of a YAML file to point at wherever an
-upstream step's outputs got staged.
-
-The first design here tried a separate "render the config" step followed by
-a separate "run the processor with that config" step. **That failed in an
-actual `cwltool` run**: each CWL step runs in its own container with its own
-temporary file staging, so a path baked into the generated config by one
-step's container (e.g. wherever `labels_dir` happened to be mounted) is not
-valid in the *next* step's container -- `heatwise-patch-extraction` errored
-with `<staged labels path> does not exist`.
-
-The fix: **render the config and run the processor in the same container**,
-via `tools/extract_patches_pipeline.cwl` / `tools/predict_pipeline.cwl` +
-`scripts/run_patch_extraction.py` / `scripts/run_predict.py`. Each of these
-does both steps back to back inside one `docker run`, so every staged path
-stays valid the whole time.
-
-Running a *different* script inside `heatwise-patch-extraction`'s /
-`heatwise-lcz-classification`'s own image isn't possible directly, though:
-those images use `ENTRYPOINT ["python", "/app/processor.py"]`, and Docker
-*appends* `docker run IMAGE <args>` to a fixed `ENTRYPOINT` rather than
-replacing it (confirmed by an earlier `cwltool` run against those repos'
-own CWL). So `docker/*.Dockerfile` here build two **thin derived images**
-(`FROM heatwise-patch-extraction:latest` / `FROM heatwise-lcz-classification:latest`,
-with `ENTRYPOINT` cleared and `CMD` set instead, so `docker run` arguments
-*do* fully replace it) -- this only layers on top of the existing verified
-images, it doesn't touch the original Dockerfiles/repos.
-
-## Pipeline diagram
-
-```
-                    ┌─────────────────────────┐
- prep_config ──────►│ prep                    │
- prep_catalog ─────►│ (heatwise-hsi-lst-prep) │──► output_directory ─┐
-                    └─────────────────────────┘                     │
-                                                                     ▼
- patch_config_template ─────►┌──────────────────────────────┐
- labels_dir/basename ───────►│ extract_patches               │
- sentinel2 ──────────────────►│ (render config + run          │──► patch_h5 ──┐
-                              │  heatwise-patch-extraction,   │               │
-                              │  merged, one container)       │               │
-                              └──────────────────────────────┘               ▼
-                                                              ┌──────────────────────────┐
-                                               train_config ─►│ train                    │
-                                                              │ (heatwise-lcz-           │──► output_directory ──┐
-                                                              │  classification)         │                       │
-                                                              └──────────────────────────┘                       │
-                                                                                                                  ▼
- predict_config_template ───►┌──────────────────────────────┐
- experiment_name ────────────►│ predict                       │
- sentinel2 ───────────────────►│ (render config + run          │──► lcz_map
-                              │  heatwise-lcz-classification, │
-                              │  merged, one container)       │
-                              └──────────────────────────────┘
+```mermaid
+flowchart LR
+    A["prep: HSI/LST preprocessing"] --> B["extract_patches: render config + run"]
+    B --> C["train: LCZ classifier"]
+    C --> D["predict: render config + predict + write STAC"]
+    A --> D
+    D --> E["lcz_map.tif"]
+    D --> F["catalog.json"]
 ```
 
 ## Build
 
-The three original images must already be built (`heatwise-hsi-lst-prep:latest`,
-`heatwise-patch-extraction:latest`, `heatwise-lcz-classification:latest`),
-plus the two thin derived ones this repo adds:
+Until the images are published to a registry, build all images locally using
+the same versioned names that the CWL files reference. This keeps local tests
+aligned with the eventual delivery tags:
 
 ```bash
-docker build -f docker/patch-extraction-pipeline.Dockerfile -t heatwise-patch-extraction-pipeline:latest .
-docker build -f docker/lcz-classification-pipeline.Dockerfile -t heatwise-lcz-classification-pipeline:latest .
+# From the three processor repos
+docker build -t ghcr.io/heatwise-lcz/heatwise-hsi-lst-prep:0.1.0 ../heatwise-hsi-lst-prep
+docker build -t ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.0 ../heatwise-patch-extraction
+docker build -t ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.0 ../heatwise-lcz-classification
+
+# From this repo root
+docker build -f docker/patch-extraction-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0 .
+docker build -f docker/lcz-classification-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-lcz-classification-pipeline:0.1.0 .
 ```
 
-## Run
+Rebuild the derived images whenever [scripts/run_patch_extraction.py](scripts/run_patch_extraction.py)
+or [scripts/run_predict.py](scripts/run_predict.py) changes; the containers
+run the baked-in copies.
+
+For registry delivery, push the same five tags after they have been tested
+locally. No CWL file changes should be needed after the push.
+
+## Run CWL
 
 ```bash
-cwltool heatwise_pipeline.cwl examples/job.yaml
+cwltool --outdir cwl_output heatwise_pipeline.cwl examples/job.yaml
 ```
 
-`examples/job.yaml` reuses the already-verified sample data/configs that
-ship in the three original repos (no data duplicated here -- only the two
-templates, the two glue+run scripts, and the job file itself are new):
+[examples/job.yaml](examples/job.yaml) is self-contained: sample data are
+under [data/](data/), and configs/templates are under [examples/](examples/).
 
-| Workflow input | Points at |
+Workflow outputs copied to `--outdir`:
+
+| Output | Content |
 |---|---|
-| `prep_config` | `../heatwise-hsi-lst-prep/examples/run_all_config_docker.yaml` |
-| `prep_catalog` | `../heatwise-hsi-lst-prep/examples/stac_input/catalog_docker.json` |
-| `sentinel2` | `../heatwise-hsi-lst-prep/examples/stac_input/Berlin_S2_2024-10-24_sample.tif` |
-| `labels_dir` / `labels_basename` | `../heatwise-patch-extraction/data/Berlin` / `Berlin_labels_sample` |
-| `train_config` | `../heatwise-lcz-classification/examples/train_config_sample.yaml` |
-| `patch_config_template` / `predict_config_template` | `examples/*.yaml` (new, in this repo) |
-| `extract_patches_script` / `predict_script` | `scripts/run_patch_extraction.py` / `scripts/run_predict.py` (new, in this repo) |
+| `lcz_map` | Final LCZ classification GeoTIFF |
+| `stac_catalog` | Root STAC catalog for final products |
+| `predict_output/` | LCZ map, metric CSV copies, STAC catalog and item |
+| `prep_output/` | HSI/LST prep outputs and prep STAC |
+| `patch_h5` | Extracted training patches |
+| `train_output/` | Checkpoints, confusion matrices and summary.csv |
 
-## Run locally without Docker/CWL
+## Run Locally Without Docker/CWL
 
-This is how the full chain was verified end to end (see Status below) and is
-the "local Python test" level of the EOAP guideline. Only `pyyaml` is needed
-(`pip install -r requirements.txt`); the three processor repos must sit next
-to this folder and have their own environments installed. Run from this
-folder:
+This is the local Python test level of the EOAP guideline. Only `pyyaml` is
+needed for the glue scripts (`pip install -r requirements.txt`); the three
+processor repos must be checked out and have their own environments installed.
+Adjust the `../heatwise-*` paths if your checkout layout differs.
+
+All four steps are wrapped in [examples/run_local.sh](examples/run_local.sh)
+(`bash examples/run_local.sh`; override repo locations via
+`PREP_REPO`/`PATCH_REPO`/`LCZ_REPO`). The individual commands:
 
 ```bash
-# 1. prep -- writes 03_hsi_final/, 04_lst_final/ etc. under output/prep
 python ../heatwise-hsi-lst-prep/processor.py run-all \
     --config ../heatwise-hsi-lst-prep/examples/run_all_config.yaml \
     --input-catalog ../heatwise-hsi-lst-prep/examples/stac_input/catalog.json \
     --output-dir output/prep
 
-# 2. render patch config + extract patches (one script, same as in-container)
 python scripts/run_patch_extraction.py \
     --template examples/patch_config_template.yaml \
     --prep-dir output/prep \
-    --sentinel2 ../heatwise-hsi-lst-prep/examples/stac_input/Berlin_S2_2024-10-24_sample.tif \
-    --labels-dir ../heatwise-patch-extraction/data/Berlin \
+    --sentinel2 data/Berlin_S2_2024-10-24_sample.tif \
+    --labels-dir data/Berlin_labels \
     --labels-basename Berlin_labels_sample \
     --output-h5 output/patches.h5 \
     --rendered-config output/patch_config_rendered.yaml \
     --processor ../heatwise-patch-extraction/processor.py
 
-# 3. train
 python ../heatwise-lcz-classification/processor.py train \
     --h5-dir output/patches.h5 \
-    --config ../heatwise-lcz-classification/examples/train_config_sample.yaml \
+    --config examples/train_config_sample.yaml \
     --output-dir output/train
 
-# 4. render predict config + predict -> output/lcz_map.tif
 python scripts/run_predict.py \
     --template examples/predict_config_template.yaml \
     --prep-dir output/prep \
-    --sentinel2 ../heatwise-hsi-lst-prep/examples/stac_input/Berlin_S2_2024-10-24_sample.tif \
+    --sentinel2 data/Berlin_S2_2024-10-24_sample.tif \
     --train-dir output/train \
     --experiment-name HSI-BS \
-    --output output/lcz_map.tif \
+    --output-dir output/predict \
     --rendered-config output/predict_config_rendered.yaml \
     --processor ../heatwise-lcz-classification/processor.py
 ```
 
-The two glue scripts default `--processor` to `/app/processor.py` and
-`--rendered-config` to `/tmp/...` (their in-container values); outside Docker
-both must be overridden as above (on Windows `/tmp` doesn't exist at all).
-
 ## Status
 
-- **The full chain's *logic* has been verified end to end locally in plain
-  Python** (no Docker/CWL): ran `heatwise-hsi-lst-prep` ->
-  `run_patch_extraction.py` (render + `heatwise-patch-extraction`) ->
-  `train` -> `run_predict.py` (render + predict), using real intermediate
-  outputs at each step, and it produced a valid LCZ map.
-- **The full 4-step `Workflow` has passed an end-to-end `cwltool` run**
-  (2026-07-09): `cwltool --outdir cwl_output heatwise_pipeline.cwl
-  examples/job.yaml` finished with `Final process status is success`, all
-  four steps (`prep` -> `extract_patches` -> `train` -> `predict`)
-  completed, and `cwl_output/` contained the LCZ map GeoTIFF, patches.h5,
-  and the prep/train directories. (The original two-step glue design --
-  separate render/run steps -- had failed as described above and was
-  redesigned into the current merged single-step-per-stage architecture
-  before this run.)
-- **Windows note**: recent cwltool versions dropped native-Windows support
-  and crash on Unix-only APIs (`import pwd` in cwltool's cwlprov and in
-  spython, `os.geteuid()` in cwltool's docker.py). The run above needed
-  three small guards patched into site-packages; a `pip install --upgrade`
-  of cwltool/spython will undo them. The officially supported route is
-  running cwltool inside WSL2.
-- **Known wart**: `prep_output` and `train_output` are both directories
-  literally named `output`, so with a shared `--outdir` their contents get
-  merged into one `output/` folder (prep's 01..04 subfolders + train's
-  best_model/confusion-matrix files side by side). Harmless, but rename one
-  of the steps' `output_dir` inputs if clean separation is wanted.
+- The full Python chain has been verified locally with real intermediate
+  outputs and produced a valid LCZ map.
+- The restructured CWL workflow has passed an end-to-end `cwltool` run on
+  2026-07-09 with `Final process status is success`.
+- Native Windows `cwltool` may need local guards for Unix-only APIs in recent
+  versions. WSL2 is the recommended route for repeatable CWL execution.
+- Still pending for full EOAP delivery: push the five `0.1.0` Docker images
+  to a registry and test on an EOAP/APEx-compatible platform.
