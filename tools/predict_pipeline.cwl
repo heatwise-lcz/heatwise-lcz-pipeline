@@ -58,6 +58,12 @@ outputs:
     outputBinding:
       glob: $(inputs.output_dir_name)/lcz_map.tif
 
+  lcz_map_preview:
+    type: File?
+    outputBinding:
+      glob: $(inputs.output_dir_name)/lcz_map_preview.png
+    doc: Colour preview PNG (produced when the predict config template sets save_png true).
+
   stac_catalog:
     type: File
     outputBinding:

@@ -88,7 +88,7 @@ steps:
       sentinel2: sentinel2
       train_dir: train/output_directory
       experiment_name: experiment_name
-    out: [lcz_map, stac_catalog, output_directory]
+    out: [lcz_map, lcz_map_preview, stac_catalog, output_directory]
 
 outputs:
   prep_output:
@@ -103,6 +103,10 @@ outputs:
   lcz_map:
     type: File
     outputSource: predict/lcz_map
+  lcz_map_preview:
+    type: File?
+    outputSource: predict/lcz_map_preview
+    doc: Colour preview PNG of the final LCZ map.
   stac_catalog:
     type: File
     outputSource: predict/stac_catalog
