@@ -9,14 +9,14 @@ prep_catalog:
   path: prep_catalog_docker.json
 sentinel2:
   class: File
-  path: ../data/Berlin_S2_2024-10-24_sample.tif
+  path: ../data/Berlin_S2.tif
 patch_config_template:
   class: File
   path: patch_config_template.yaml
 labels_dir:
   class: Directory
   path: ../data/Berlin_labels
-labels_basename: Berlin_labels_sample
+labels_basename: Berlin_labels
 train_config:
   class: File
   path: train_config_sample.yaml

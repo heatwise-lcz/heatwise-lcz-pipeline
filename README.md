@@ -24,7 +24,7 @@ consumes them only through Docker images.
 - `extract_patches` and `predict` run merged glue+run CommandLineTools. Their
   glue scripts are baked into thin derived images built from [docker/](docker/).
 
-Docker references are written in release shape and pinned to `0.1.0` tags
+Docker references are written in release shape and pinned to versioned tags
 under `ghcr.io/heatwise-lcz/...`. Before the images are published, build and tag
 them locally with the same names. After publication, the same CWL files can
 run elsewhere by pulling those exact tags.
@@ -76,7 +76,7 @@ heatwise-lcz-pipeline/
 |   |-- predict_config_template.yaml
 |   |-- train_config_sample.yaml
 |-- data/
-|   |-- Berlin_S2_2024-10-24_sample.tif
+|   |-- Berlin_S2.tif
 |   |-- Berlin_labels/
 |-- README.md
 |-- LICENSE
@@ -103,7 +103,7 @@ aligned with the eventual delivery tags:
 
 ```bash
 # From the three processor repos
-docker build -t ghcr.io/heatwise-lcz/heatwise-hsi-lst-prep:0.1.0 ../heatwise-hsi-lst-prep
+docker build -t ghcr.io/heatwise-lcz/heatwise-hsi-lst-prep:0.1.1 ../heatwise-hsi-lst-prep
 docker build -t ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.0 ../heatwise-patch-extraction
 docker build -t ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.0 ../heatwise-lcz-classification
 
@@ -159,9 +159,9 @@ python ../heatwise-hsi-lst-prep/processor.py run-all \
 python scripts/run_patch_extraction.py \
     --template examples/patch_config_template.yaml \
     --prep-dir output/prep \
-    --sentinel2 data/Berlin_S2_2024-10-24_sample.tif \
+    --sentinel2 data/Berlin_S2.tif \
     --labels-dir data/Berlin_labels \
-    --labels-basename Berlin_labels_sample \
+    --labels-basename Berlin_labels \
     --output-h5 output/patches.h5 \
     --rendered-config output/patch_config_rendered.yaml \
     --processor ../heatwise-patch-extraction/processor.py
@@ -174,7 +174,7 @@ python ../heatwise-lcz-classification/processor.py train \
 python scripts/run_predict.py \
     --template examples/predict_config_template.yaml \
     --prep-dir output/prep \
-    --sentinel2 data/Berlin_S2_2024-10-24_sample.tif \
+    --sentinel2 data/Berlin_S2.tif \
     --train-dir output/train \
     --experiment-name HSI-BS \
     --output-dir output/predict \
@@ -190,5 +190,6 @@ python scripts/run_predict.py \
   2026-07-09 with `Final process status is success`.
 - Native Windows `cwltool` may need local guards for Unix-only APIs in recent
   versions. WSL2 is the recommended route for repeatable CWL execution.
-- Still pending for full EOAP delivery: push the five `0.1.0` Docker images
-  to a registry and test on an EOAP/APEx-compatible platform.
+- Still pending for full EOAP delivery: test on an EOAP/APEx-compatible
+  platform. The five Docker images are published on GHCR under
+  `ghcr.io/heatwise-lcz/` with pinned version tags.

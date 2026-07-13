@@ -41,7 +41,7 @@ inputs:
     doc: Directory containing the labels .shp + siblings (sample under data/Berlin_labels)
   labels_basename:
     type: string
-    doc: e.g. "Berlin_labels_sample" (no .shp extension)
+    doc: e.g. "Berlin_labels" (no .shp extension)
   train_config:
     type: File
     doc: heatwise-lcz-classification train config (examples/train_config_sample.yaml)

@@ -40,9 +40,9 @@ echo "== 2/4 extract_patches (render config + run) =="
 python scripts/run_patch_extraction.py \
     --template examples/patch_config_template.yaml \
     --prep-dir "$OUT/prep" \
-    --sentinel2 data/Berlin_S2_2024-10-24_sample.tif \
+    --sentinel2 data/Berlin_S2.tif \
     --labels-dir data/Berlin_labels \
-    --labels-basename Berlin_labels_sample \
+    --labels-basename Berlin_labels \
     --output-h5 "$OUT/patches.h5" \
     --rendered-config "$OUT/patch_config_rendered.yaml" \
     --processor "$PATCH_REPO/processor.py"
@@ -57,7 +57,7 @@ echo "== 4/4 predict (render config + predict + STAC) =="
 python scripts/run_predict.py \
     --template examples/predict_config_template.yaml \
     --prep-dir "$OUT/prep" \
-    --sentinel2 data/Berlin_S2_2024-10-24_sample.tif \
+    --sentinel2 data/Berlin_S2.tif \
     --train-dir "$OUT/train" \
     --experiment-name "$EXPERIMENT" \
     --output-dir "$OUT/predict" \
