@@ -128,6 +128,31 @@ cwltool --outdir cwl_output heatwise_pipeline.cwl examples/job.yaml
 [examples/job.yaml](examples/job.yaml) is self-contained: sample data are
 under [data/](data/), and configs/templates are under [examples/](examples/).
 
+### Where each piece of sample data lives (and why)
+
+The workflow moves data through three different channels, which is why
+`data/` contains only Sentinel-2 and the labels:
+
+- **Raw HSI + LSTM: baked into the prep image** (`/app/examples/stac_input/`
+  in `ghcr.io/heatwise-lcz/heatwise-hsi-lst-prep`, shipped in that repo's
+  `examples/stac_input/`). The prep step reads its inputs via a STAC
+  catalog, and `cwltool` only stages the one `catalog.json` File given in
+  the job — not the item/asset files it references (confirmed by an actual
+  run). So the catalog's hrefs must point at absolute in-image paths, and
+  the rasters must already be in the image. On a real platform, the staged
+  input catalog replaces the `prep_catalog` input and this constraint
+  disappears.
+- **Processed HSI (`hsi_bs`) + LST (`lst_final`): produced at runtime** by
+  the prep step and passed to `extract_patches`/`predict` through the CWL
+  step connection (`prep_dir`); they are deliberately not shipped —
+  producing them live is the point of the pipeline.
+- **Sentinel-2 + labels: staged from `data/` via the job file.** These are
+  ordinary CWL `File`/`Directory` inputs consumed directly by the
+  `extract_patches` and `predict` glue steps (`--sentinel2`,
+  `--labels-dir`), so they stage normally. The prep step's sharpening uses
+  the in-image copy of the same S2 scene instead, for the catalog reason
+  above.
+
 Workflow outputs copied to `--outdir`:
 
 | Output | Content |
