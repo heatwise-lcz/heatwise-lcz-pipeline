@@ -28,8 +28,8 @@ doc: >
 
 requirements:
   DockerRequirement:
-    dockerImageId: ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0
-    dockerPull: ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0
+    dockerImageId: ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.1
+    dockerPull: ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.1
 
 baseCommand: python
 arguments:

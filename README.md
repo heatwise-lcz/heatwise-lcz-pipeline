@@ -104,12 +104,12 @@ aligned with the eventual delivery tags:
 ```bash
 # From the three processor repos
 docker build -t ghcr.io/heatwise-lcz/heatwise-hsi-lst-prep:0.1.1 ../heatwise-hsi-lst-prep
-docker build -t ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.0 ../heatwise-patch-extraction
-docker build -t ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.0 ../heatwise-lcz-classification
+docker build -t ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.1 ../heatwise-patch-extraction
+docker build -t ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.1 ../heatwise-lcz-classification
 
 # From this repo root
-docker build -f docker/patch-extraction-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0 .
-docker build -f docker/lcz-classification-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-lcz-classification-pipeline:0.1.0 .
+docker build -f docker/patch-extraction-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.1 .
+docker build -f docker/lcz-classification-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-lcz-classification-pipeline:0.1.1 .
 ```
 
 Rebuild the derived images whenever [scripts/run_patch_extraction.py](scripts/run_patch_extraction.py)

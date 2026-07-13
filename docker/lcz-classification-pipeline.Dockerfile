@@ -4,12 +4,12 @@
 # (ENTRYPOINT vs CMD command-replacement semantics).
 #
 # Build from the repo root:
-# docker build -f docker/lcz-classification-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-lcz-classification-pipeline:0.1.0 .
+# docker build -f docker/lcz-classification-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-lcz-classification-pipeline:0.1.1 .
 #
 # Before the base image is published, build/tag it locally with this same
 # release-shaped name:
-# docker build -t ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.0 ../heatwise-lcz-classification
-FROM ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.0
+# docker build -t ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.1 ../heatwise-lcz-classification
+FROM ghcr.io/heatwise-lcz/heatwise-lcz-classification:0.1.1
 COPY scripts/run_predict.py /app/run_predict.py
 ENTRYPOINT []
 CMD ["python", "/app/run_predict.py", "--help"]

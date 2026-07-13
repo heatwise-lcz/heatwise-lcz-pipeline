@@ -14,12 +14,12 @@
 #    touching the original repo/image at all.
 #
 # Build from the repo root:
-# docker build -f docker/patch-extraction-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.0 .
+# docker build -f docker/patch-extraction-pipeline.Dockerfile -t ghcr.io/heatwise-lcz/heatwise-patch-extraction-pipeline:0.1.1 .
 #
 # Before the base image is published, build/tag it locally with this same
 # release-shaped name:
-# docker build -t ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.0 ../heatwise-patch-extraction
-FROM ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.0
+# docker build -t ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.1 ../heatwise-patch-extraction
+FROM ghcr.io/heatwise-lcz/heatwise-patch-extraction:0.1.1
 COPY scripts/run_patch_extraction.py /app/run_patch_extraction.py
 ENTRYPOINT []
 CMD ["python", "/app/run_patch_extraction.py", "--help"]
